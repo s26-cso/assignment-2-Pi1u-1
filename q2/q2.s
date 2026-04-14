@@ -1,158 +1,136 @@
-    .text
-    .globl main
-    .extern atoi
-    .extern printf
+.section .data
+fmt_int:   .string "%d"
+fmt_space: .string " "
+fmt_nl:    .string "\n"
 
-# Registers:
-# s0 → n
-# s1 → arr base
-# s2 → result base
-# s3 → stack base
-# s4 → stack top index
+.section .bss
+arr:    .space 400  # up to 100 ints
+result: .space 400
+stk:    .space 400  # monotone stack of indices
+
+.section .text
+.globl main
 
 main:
-    addi sp, sp, -48
-    sd ra, 40(sp)
-    sd s0, 32(sp)
-    sd s1, 24(sp)
-    sd s2, 16(sp)
-    sd s3, 8(sp)
-    sd s4, 0(sp)
+    addi sp, sp, -64
+    sd ra, 56(sp)
+    sd s0, 48(sp)  # n
+    sd s1, 40(sp)  # loop index i
+    sd s2, 32(sp)  # (free)
+    sd s3, 24(sp)  # arr[i] during nge
+    sd s4, 16(sp)  # stack top
+    sd s5,  8(sp)  # i for nge loop
+    sd s6,  0(sp)  # argv
 
-    addi s0, a0, -1       # n = argc - 1
-    mv t0, a1           # argv
+    addi s0, a0, -1     # n = argc - 1
+    mv s6, a1         # argv
 
-    # allocate arr (n * 4)
-    slli a0, s0, 2
-    call malloc
-    mv s1, a0
-
-    # allocate result
-    slli a0, s0, 2
-    call malloc
-    mv s2, a0
-
-    # allocate stack (n * 4 for indices)
-    slli a0, s0, 2
-    call malloc
-    mv s3, a0
-
-    li s4, -1           # stack top = -1
-
-
-    li t1, 1              # i = 1
-
+    li s1, 0
 parse_loop:
-    bgt t1, s0, parse_done
-
-    slli t2, t1, 3        # argv[i]
-    add t3, t0, t2
-    ld a0, 0(t3)
+    bge s1, s0, parse_done
+    slli t0, s1, 3
+    addi t0, t0, 8   # byte offset: skip argv[0] (8 bytes per ptr)
+    add t0, s6, t0
+    ld a0, 0(t0)  # a0 = pointer to argv[i+1] string
     call atoi
-
-    addi t4, t1, -1
-    slli t4, t4, 2
-    add t5, s1, t4
-    sw a0, 0(t5)
-
-    addi t1, t1, 1
+    la t0, arr
+    slli t1, s1, 2
+    add t0, t0, t1
+    sw a0, 0(t0)  # arr[i] = atoi result
+    addi s1, s1, 1
     j parse_loop
-
 parse_done:
 
-
-    li t1, 0
-
+    li s1, 0
 init_loop:
-    bge t1, s0, nge_start
-    slli t2, t1, 2
-    add t3, s2, t2
-    li t4, -1
-    sw t4, 0(t3)
-    addi t1, t1, 1
+    bge s1, s0, init_done
+    la t0, result
+    slli t1, s1, 2
+    add t0, t0, t1
+    li t1, -1
+    sw t1, 0(t0)
+    addi s1, s1, 1
     j init_loop
+init_done:
 
-
-nge_start:
-    addi t1, s0, -1       # i = n-1
+    li s4, -1   # stack top (-1 = empty)
+    addi s5, s0, -1  # i = n - 1
 
 nge_loop:
-    blt t1, zero, print_result
+    blt s5, zero, nge_done
 
-    # current value = arr[i]
-    slli t2, t1, 2
-    add t3, s1, t2
-    lw t4, 0(t3)
+    la t0, arr
+    slli t1, s5, 2
+    add t0, t0, t1
+    lw s3, 0(t0)
 
-nge_pop:
-    blt s4, zero, nge_check
-
-    # top index
-    slli t5, s4, 2
-    add t6, s3, t5
-    lw t7, 0(t6)
-
-    # arr[top]
-    slli t8, t7, 2
-    add t9, s1, t8
-    lw t10, 0(t9)
-
-    ble t10, t4, pop_stack
-    j nge_check
-
-pop_stack:
+pop_loop:
+    blt s4, zero, pop_done
+    la t0, stk
+    slli t1, s4, 2
+    add t0, t0, t1
+    lw t2, 0(t0)   # t2 = stk.top() (an index into arr)
+    la t3, arr
+    slli t4, t2, 2
+    add t3, t3, t4
+    lw t3, 0(t3)   # t3 = arr[stk.top()]
+    bgt t3, s3, pop_done   # strictly greater → stop popping
     addi s4, s4, -1
-    j nge_pop
+    j pop_loop
+pop_done:
 
-nge_check:
-    blt s4, zero, push_stack
+    blt s4, zero, do_push
+    la t0, stk
+    slli t1, s4, 2
+    add t0, t0, t1
+    lw t2, 0(t0)   # t2 = stk.top()
+    la t0, result
+    slli t1, s5, 2
+    add t0, t0, t1
+    sw t2, 0(t0)  # result[i] = stk.top()
 
-    # result[i] = stack[top]
-    slli t5, s4, 2
-    add t6, s3, t5
-    lw t7, 0(t6)
-
-    slli t8, t1, 2
-    add t9, s2, t8
-    sw t7, 0(t9)
-
-push_stack:
+do_push:
     addi s4, s4, 1
-    slli t5, s4, 2
-    add t6, s3, t5
-    sw t1, 0(t6)
+    la t0, stk
+    slli t1, s4, 2
+    add t0, t0, t1
+    sw s5, 0(t0)  # stk.push(i)
 
-    addi t1, t1, -1
+    addi s5, s5, -1
     j nge_loop
+nge_done:
 
-
-print_result:
-    li t1, 0
-
+    li s1, 0
 print_loop:
-    bge t1, s0, done
+    bge s1, s0, print_done
 
-    slli t2, t1, 2
-    add t3, s2, t2
-    lw a1, 0(t3)
-
-    la a0, fmt
+    la t0, result
+    slli t1, s1, 2
+    add t0, t0, t1
+    lw a1, 0(t0)
+    la a0, fmt_int
     call printf
 
-    addi t1, t1, 1
+    addi t0, s1, 1
+    bge t0, s0, skip_space
+    la a0, fmt_space
+    call printf
+skip_space:
+    addi s1, s1, 1
     j print_loop
+print_done:
 
-done:
-    ld ra, 40(sp)
-    ld s0, 32(sp)
-    ld s1, 24(sp)
-    ld s2, 16(sp)
-    ld s3, 8(sp)
-    ld s4, 0(sp)
-    addi sp, sp, 48
+    la a0, fmt_nl
+    call printf
+
+    ld ra, 56(sp)
+    ld s0, 48(sp)
+    ld s1, 40(sp)
+    ld s2, 32(sp)
+    ld s3, 24(sp)
+    ld s4, 16(sp)
+    ld s5,  8(sp)
+    ld s6,  0(sp)
+    addi sp, sp, 64
+    li a0, 0
     ret
-
-
-    .data
-fmt:
-    .asciz "%d "
