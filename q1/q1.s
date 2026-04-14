@@ -11,8 +11,8 @@
     .globl make_node
 make_node:
     addi sp, sp, -16
-    sw ra, 8(sp)
-    sw s0, 0(sp)  
+    sd ra, 8(sp)
+    sd s0, 0(sp)  
 
     mv s0, a0         # save val
 
@@ -20,20 +20,20 @@ make_node:
     call malloc       # a0 = new node
 
     sw s0, 0(a0)      # node->val = val
-    sw zero, 8(a0)    # node->left = NULL
-    sw zero, 16(a0)   # node->right = NULL
+    sd zero, 8(a0)    # node->left = NULL
+    sd zero, 16(a0)   # node->right = NULL
 
-    lw ra, 8(sp)
-    lw s0, 0(sp)
+    ld ra, 8(sp)
+    ld s0, 0(sp)
     addi sp, sp, 16
     ret
 
     .globl insert
 insert:
     addi sp, sp, -32
-    sw ra, 24(sp)
-    sw s0, 16(sp)   # root
-    sw s1, 8(sp)    # val
+    sd ra, 24(sp)
+    sd s0, 16(sp)   # root
+    sd s1, 8(sp)    # val
 
     mv s0, a0
     mv s1, a1
@@ -55,24 +55,24 @@ insert_normal:
     j insert_done
 
 go_left:
-    lw a0, 8(s0)       # root->left
+    ld a0, 8(s0)       # root->left
     mv a1, s1
     call insert
-    sw a0, 8(s0)       # update left
+    sd a0, 8(s0)       # update left
     mv a0, s0
     j insert_done
 
 go_right:
-    lw a0, 16(s0)      # root->right
+    ld a0, 16(s0)      # root->right
     mv a1, s1
     call insert
-    sw a0, 16(s0)      # update right
+    sd a0, 16(s0)      # update right
     mv a0, s0
 
 insert_done:
-    lw ra, 24(sp)
-    lw s0, 16(sp)
-    lw s1, 8(sp)
+    ld ra, 24(sp)
+    ld s0, 16(sp)
+    ld s1, 8(sp)
     addi sp, sp, 32
     ret
 
@@ -86,11 +86,11 @@ get:
     blt a1, t0, get_left
 
 get_right:
-    lw a0, 16(a0)
+    ld a0, 16(a0)
     j get
 
 get_left:
-    lw a0, 8(a0)
+    ld a0, 8(a0)
     j get
 
 get_done:
@@ -99,9 +99,9 @@ get_done:
     .globl getAtMost
 getAtMost:
     addi sp, sp, -24
-    sw ra, 16(sp)
-    sw s0, 8(sp)    # val
-    sw s1, 0(sp)    # root
+    sd ra, 16(sp)
+    sd s0, 8(sp)    # val
+    sd s1, 0(sp)    # root
 
     mv s0, a0       # val
     mv s1, a1       # root
@@ -117,18 +117,18 @@ loop_atmost:
 
     # valid candidate
     mv t0, t1
-    lw s1, 16(s1)   # go right
+    ld s1, 16(s1)   # go right
     j loop_atmost
 
 go_left_atmost:
-    lw s1, 8(s1)
+    ld s1, 8(s1)
     j loop_atmost
 
 done_atmost:
     mv a0, t0
 
-    lw ra, 16(sp)
-    lw s0, 8(sp)
-    lw s1, 0(sp)
+    ld ra, 16(sp)
+    ld s0, 8(sp)
+    ld s1, 0(sp)
     addi sp, sp, 24
     ret
